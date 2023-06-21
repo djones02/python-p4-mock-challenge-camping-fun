@@ -20,10 +20,129 @@ migrate = Migrate(app, db)
 
 db.init_app(app)
 
+api=Api(app)
 
 @app.route('/')
 def home():
     return ''
+
+class Campers(Resource):
+    def get(self):
+        try:
+            campers = Camper.query.all()
+            all_campers = []
+            for camper in campers:
+                all_campers.append(camper.to_dict(only=("id", "name", "age")))
+            return all_campers, 200
+        except:
+            return {"error": "400: Bad Request"}, 400
+        
+    def post(self):
+        try:
+            new_camper = Camper(
+                name=request.json['name'],
+                age=request.json['age']
+            )
+            db.session.add(new_camper)
+            db.session.commit()
+            return new_camper.to_dict(only=("id", "name", "age")), 201
+        except:
+            return {"errors": "400: validation error"}, 400
+    
+api.add_resource(Campers, "/campers")
+
+class CampersById(Resource):
+    def get(self, id):
+        try:
+            campers = Camper.query.filter_by(id=id).first().to_dict()
+            return make_response(jsonify(campers), 200)
+        except:
+            return {"error": "Camper not found"}, 404
+        
+    def patch(self, id):
+        try:
+            camper = Camper.query.filter_by(id=id).first()
+            if not camper:
+                return {"error": "Camper not found"}, 404
+
+            if 'name' in request.json:
+                name = request.json['name']
+                if name != '' and not isinstance(name, str):
+                    raise ValueError("Invalid name")
+                setattr(camper, 'name', name)
+
+            if 'age' in request.json:
+                age = request.json['age']
+                if age is not None and not isinstance(age, int):
+                    raise ValueError("Invalid age")
+                setattr(camper, 'age', age)
+
+            db.session.add(camper)
+            db.session.commit()
+            return camper.to_dict(), 202
+
+        except:
+            return {"errors": ["validation errors"]}, 400
+        
+api.add_resource(CampersById, "/campers/<int:id>")
+
+class Activities(Resource):
+    def get(self):
+        try:
+            activities = [activity.to_dict() for activity in Activity.query.all()]
+            return activities, 200
+        except:
+            return {"error": "400: Bad Request"}, 400
+
+api.add_resource(Activities, "/activities")
+
+class ActivityById(Resource):
+    def patch(self, id):
+        try:
+            activity = Activity.query.filter_by(id=id).first()
+            if request.json['name']:
+                setattr(activity, 'name', request.json['name'])
+            db.session.add(activity)
+            db.session.commit()
+            return activity.to_dict(), 202
+        except:
+            raise Exception('error')
+    
+    def delete(self, id):
+        try:
+            activity = Activity.query.filter_by(id=id).first()
+            db.session.delete(activity)
+            db.session.commit()
+            return make_response("", 204)
+        except:
+            return {"error": "Activity not found"}, 404
+    
+        
+api.add_resource(ActivityById, "/activities/<int:id>")
+
+
+class Signups(Resource):
+    def post(self):
+        try:
+            data = request.get_json()
+            signup = Signup(
+                time=data.get('time'),
+                camper_id=data.get('camper_id'),
+                activity_id=data.get('activity_id'))
+            db.session.add(signup)
+            db.session.commit()
+            response_data = {
+                'id': signup.id,
+                'camper_id': signup.camper_id,
+                'activity_id': signup.activity_id,
+                'activity': signup.activity.to_dict(),
+                'camper': signup.camper.to_dict()
+            }
+            return response_data, 201
+        except:
+            return {"errors": ["validation errors"]}, 400
+        
+api.add_resource(Signups, "/signups")
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
