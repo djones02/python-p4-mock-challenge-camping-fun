@@ -123,24 +123,17 @@ api.add_resource(ActivityById, "/activities/<int:id>")
 
 class Signups(Resource):
     def post(self):
+        data = request.get_json()
         try:
-            data = request.get_json()
             signup = Signup(
                 time=data.get('time'),
                 camper_id=data.get('camper_id'),
                 activity_id=data.get('activity_id'))
             db.session.add(signup)
             db.session.commit()
-            response_data = {
-                'id': signup.id,
-                'camper_id': signup.camper_id,
-                'activity_id': signup.activity_id,
-                'activity': signup.activity.to_dict(),
-                'camper': signup.camper.to_dict()
-            }
-            return response_data, 201
         except:
             return {"errors": ["validation errors"]}, 400
+        return signup.to_dict(), 201
         
 api.add_resource(Signups, "/signups")
 
